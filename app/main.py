@@ -1,8 +1,10 @@
 # main.py
 from fastapi import FastAPI
-from app.database import Base, engine
+from app.database import Base, engine, get_db
 from app.models import meeting
 from app.routes import meetings
+from sqlalchemy.orm import Session
+from fastapi import Depends
 
 app = FastAPI()
 
@@ -18,4 +20,18 @@ except Exception as e:
 @app.get("/")
 def root():
     return {"message": "API is running"}
+
+
+@app.get("/health")
+def health_check(db: Session = Depends(get_db)):
+    try:
+        return {
+            "status": "healthy",
+            "database": "connected"
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "database": "disconnected"
+        }
 
