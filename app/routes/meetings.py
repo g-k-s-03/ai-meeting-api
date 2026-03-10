@@ -8,6 +8,8 @@ from app.models.meeting import Meeting
 from app.schemas.meeting import MeetingResponse
 from app.utils.file_handler import upload_file_to_supabase
 from app.services.meeting import process_meeting
+from app.utils.auth import get_current_user
+from app.models.user import User
 from typing import List
 import json
 
@@ -22,11 +24,9 @@ def process_meeting_background(meeting_id: UUID, file_url: str, db: Session):
         print(f"🔄 Starting processing for meeting {meeting_id}")
         meeting.status = "processing"
         db.commit()
-
         print(f"🔄 Sending to AssemblyAI: {file_url}")
         result = process_meeting(file_url)
         print(f"✅ AI processing completed!")
-
         meeting.transcript = result["transcript"]
         meeting.summary = result["summary"]
         meeting.keywords = result["keywords"]
@@ -35,77 +35,42 @@ def process_meeting_background(meeting_id: UUID, file_url: str, db: Session):
         meeting.status = "completed"
         db.commit()
         print(f"✅ Meeting {meeting_id} completed successfully!")
-
     except Exception as e:
         meeting.status = "failed"
         db.commit()
         print(f"❌ Processing failed: {str(e)}")
 
-# ✅ POST /meetings/upload
+# ✅ POST /meetings/upload 🔒
 @router.post("/upload", response_model=MeetingResponse)
 async def upload_meeting(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)  # 🔒
 ):
     file_url = await upload_file_to_supabase(file)
     new_meeting = Meeting(file_path=file_url, status="uploaded")
     db.add(new_meeting)
     db.commit()
     db.refresh(new_meeting)
-    background_tasks.add_task(
-        process_meeting_background,
-        new_meeting.id,
-        file_url,
-        db
-    )
+    background_tasks.add_task(process_meeting_background, new_meeting.id, file_url, db)
     return new_meeting
 
-# ✅ GET /meetings
+# ✅ GET /meetings 🔒
 @router.get("/", response_model=List[MeetingResponse])
-def get_meetings(db: Session = Depends(get_db)):
+def get_meetings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)  # 🔒
+):
     return db.query(Meeting).all()
 
-# ✅ GET /meetings/{id}
-@router.get("/{meeting_id}", response_model=MeetingResponse)
-def get_meeting(meeting_id: UUID, db: Session = Depends(get_db)):
-    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
-    if not meeting:
-        raise HTTPException(status_code=404, detail="Meeting not found")
-    return meeting
-
-# ✅ GET /meetings/{id}/transcript
-@router.get("/{meeting_id}/transcript")
-def get_transcript(meeting_id: UUID, db: Session = Depends(get_db)):
-    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
-    if not meeting:
-        raise HTTPException(status_code=404, detail="Meeting not found")
-    return {"id": meeting_id, "transcript": meeting.transcript}
-
-# ✅ GET /meetings/{id}/summary
-@router.get("/{meeting_id}/summary")
-def get_summary(meeting_id: UUID, db: Session = Depends(get_db)):
-    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
-    if not meeting:
-        raise HTTPException(status_code=404, detail="Meeting not found")
-    return {
-        "id": meeting_id,
-        "summary": meeting.summary,
-        "keywords": meeting.keywords
-    }
-
-# ✅ GET /meetings/{id}/action-items
-@router.get("/{meeting_id}/action-items")
-def get_action_items(meeting_id: UUID, db: Session = Depends(get_db)):
-    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
-    if not meeting:
-        raise HTTPException(status_code=404, detail="Meeting not found")
-    action_items = json.loads(meeting.action_items) if meeting.action_items else []
-    return {"id": meeting_id, "action_items": action_items}
-
-# ✅ GET /meetings/search?q=keyword
+# ✅ GET /meetings/search 🔒
 @router.get("/search/")
-def search_meetings(q: str, db: Session = Depends(get_db)):
+def search_meetings(
+    q: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)  # 🔒
+):
     results = db.query(Meeting).filter(
         Meeting.transcript.ilike(f"%{q}%") |
         Meeting.summary.ilike(f"%{q}%") |
@@ -113,9 +78,62 @@ def search_meetings(q: str, db: Session = Depends(get_db)):
     ).all()
     return results
 
-# ✅ GET /meetings/{id}/export/json
+# ✅ GET /meetings/{id} 🔒
+@router.get("/{meeting_id}", response_model=MeetingResponse)
+def get_meeting(
+    meeting_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)  # 🔒
+):
+    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    return meeting
+
+# ✅ GET /meetings/{id}/transcript 🔒
+@router.get("/{meeting_id}/transcript")
+def get_transcript(
+    meeting_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)  # 🔒
+):
+    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    return {"id": meeting_id, "transcript": meeting.transcript}
+
+# ✅ GET /meetings/{id}/summary 🔒
+@router.get("/{meeting_id}/summary")
+def get_summary(
+    meeting_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)  # 🔒
+):
+    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    return {"id": meeting_id, "summary": meeting.summary, "keywords": meeting.keywords}
+
+# ✅ GET /meetings/{id}/action-items 🔒
+@router.get("/{meeting_id}/action-items")
+def get_action_items(
+    meeting_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)  # 🔒
+):
+    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    action_items = json.loads(meeting.action_items) if meeting.action_items else []
+    return {"id": meeting_id, "action_items": action_items}
+
+# ✅ GET /meetings/{id}/export/json 🔒
 @router.get("/{meeting_id}/export/json")
-def export_json(meeting_id: UUID, db: Session = Depends(get_db)):
+def export_json(
+    meeting_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)  # 🔒
+):
     meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
@@ -133,13 +151,16 @@ def export_json(meeting_id: UUID, db: Session = Depends(get_db)):
     }
     return JSONResponse(content=export_data)
 
-# ✅ GET /meetings/{id}/export/txt
+# ✅ GET /meetings/{id}/export/txt 🔒
 @router.get("/{meeting_id}/export/txt")
-def export_txt(meeting_id: UUID, db: Session = Depends(get_db)):
+def export_txt(
+    meeting_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)  # 🔒
+):
     meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
-
     content = f"""
 MEETING REPORT
 ==============
@@ -167,12 +188,15 @@ DECISIONS
 ---------
 {meeting.decisions or 'No decisions available'}
 """.strip()
-
     return PlainTextResponse(content=content)
 
-# ✅ DELETE /meetings/{id}
+# ✅ DELETE /meetings/{id} 🔒
 @router.delete("/{meeting_id}")
-def delete_meeting(meeting_id: UUID, db: Session = Depends(get_db)):
+def delete_meeting(
+    meeting_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)  # 🔒
+):
     meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
