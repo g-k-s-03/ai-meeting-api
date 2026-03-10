@@ -15,6 +15,8 @@ class MeetingResponse(BaseModel):
     transcript: Optional[str] = None
     summary: Optional[str] = None
     keywords: Optional[str] = None  
+    action_items: Optional[str] = None
+    decisions: Optional[str] = None
     status: str
     created_at: datetime
     updated_at: datetime

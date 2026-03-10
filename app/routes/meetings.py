@@ -8,6 +8,7 @@ from app.schemas.meeting import MeetingResponse
 from app.utils.file_handler import upload_file_to_supabase
 from app.services.meeting import process_meeting
 from typing import List
+import json
 
 router = APIRouter(
     prefix="/meetings",
@@ -15,33 +16,29 @@ router = APIRouter(
 )
 
 def process_meeting_background(meeting_id: UUID, file_url: str, db: Session):
-    """Runs in background after upload"""
     meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
     try:
-        print(f"Starting processing for meeting {meeting_id}")
-
-        # update status to processing
+        print(f" Starting processing for meeting {meeting_id}")
         meeting.status = "processing"
         db.commit()
-        print(f"Status updated to processing...")
 
-        # run AI pipeline
-        print(f"Sending to AssemblyAI: {file_url}")
+        print(f" Sending to AssemblyAI: {file_url}")
         result = process_meeting(file_url)
-        print(f"AI processing completed!")
+        print(f" AI processing completed!")
 
-        # save transcript, summary and keywords
         meeting.transcript = result["transcript"]
         meeting.summary = result["summary"]
-        meeting.keywords = result["keywords"]  # ← new line
+        meeting.keywords = result["keywords"]
+        meeting.action_items = result["action_items"]  
+        meeting.decisions = result["decisions"]        
         meeting.status = "completed"
         db.commit()
-        print(f"Meeting {meeting_id} completed successfully!")
+        print(f" Meeting {meeting_id} completed successfully!")
 
     except Exception as e:
         meeting.status = "failed"
         db.commit()
-        print(f"Processing failed: {str(e)}")
+        print(f" Processing failed: {str(e)}")
 
 #  POST /meetings/upload
 @router.post("/upload", response_model=MeetingResponse)
@@ -50,26 +47,17 @@ async def upload_meeting(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    # upload to Supabase Storage
     file_url = await upload_file_to_supabase(file)
-
-    # save meeting record
-    new_meeting = Meeting(
-        file_path=file_url,
-        status="uploaded"
-    )
+    new_meeting = Meeting(file_path=file_url, status="uploaded")
     db.add(new_meeting)
     db.commit()
     db.refresh(new_meeting)
-
-    # trigger AI processing in background
     background_tasks.add_task(
         process_meeting_background,
         new_meeting.id,
         file_url,
         db
     )
-
     return new_meeting
 
 #  GET /meetings
@@ -85,7 +73,46 @@ def get_meeting(meeting_id: UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Meeting not found")
     return meeting
 
-#  DELETE /meetings/{id}
+#  GET /meetings/{id}/transcript
+@router.get("/{meeting_id}/transcript")
+def get_transcript(meeting_id: UUID, db: Session = Depends(get_db)):
+    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    return {"id": meeting_id, "transcript": meeting.transcript}
+
+#  GET /meetings/{id}/summary
+@router.get("/{meeting_id}/summary")
+def get_summary(meeting_id: UUID, db: Session = Depends(get_db)):
+    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    return {
+        "id": meeting_id,
+        "summary": meeting.summary,
+        "keywords": meeting.keywords
+    }
+
+#  GET /meetings/{id}/action-items
+@router.get("/{meeting_id}/action-items")
+def get_action_items(meeting_id: UUID, db: Session = Depends(get_db)):
+    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    action_items = json.loads(meeting.action_items) if meeting.action_items else []
+    return {"id": meeting_id, "action_items": action_items}
+
+#  GET /meetings/search?q=keyword
+@router.get("/search/")
+def search_meetings(q: str, db: Session = Depends(get_db)):
+    results = db.query(Meeting).filter(
+        Meeting.transcript.ilike(f"%{q}%") |
+        Meeting.summary.ilike(f"%{q}%") |
+        Meeting.keywords.ilike(f"%{q}%")
+    ).all()
+    return results
+
+# DELETE /meetings/{id}
 @router.delete("/{meeting_id}")
 def delete_meeting(meeting_id: UUID, db: Session = Depends(get_db)):
     meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
