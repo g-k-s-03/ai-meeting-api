@@ -1,5 +1,6 @@
 # app/routes/meetings.py
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy.orm import Session
 from uuid import UUID
 from app.database import get_db
@@ -18,29 +19,29 @@ router = APIRouter(
 def process_meeting_background(meeting_id: UUID, file_url: str, db: Session):
     meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
     try:
-        print(f" Starting processing for meeting {meeting_id}")
+        print(f"🔄 Starting processing for meeting {meeting_id}")
         meeting.status = "processing"
         db.commit()
 
-        print(f" Sending to AssemblyAI: {file_url}")
+        print(f"🔄 Sending to AssemblyAI: {file_url}")
         result = process_meeting(file_url)
-        print(f" AI processing completed!")
+        print(f"✅ AI processing completed!")
 
         meeting.transcript = result["transcript"]
         meeting.summary = result["summary"]
         meeting.keywords = result["keywords"]
-        meeting.action_items = result["action_items"]  
-        meeting.decisions = result["decisions"]        
+        meeting.action_items = result["action_items"]
+        meeting.decisions = result["decisions"]
         meeting.status = "completed"
         db.commit()
-        print(f" Meeting {meeting_id} completed successfully!")
+        print(f"✅ Meeting {meeting_id} completed successfully!")
 
     except Exception as e:
         meeting.status = "failed"
         db.commit()
-        print(f" Processing failed: {str(e)}")
+        print(f"❌ Processing failed: {str(e)}")
 
-#  POST /meetings/upload
+# ✅ POST /meetings/upload
 @router.post("/upload", response_model=MeetingResponse)
 async def upload_meeting(
     background_tasks: BackgroundTasks,
@@ -60,12 +61,12 @@ async def upload_meeting(
     )
     return new_meeting
 
-#  GET /meetings
+# ✅ GET /meetings
 @router.get("/", response_model=List[MeetingResponse])
 def get_meetings(db: Session = Depends(get_db)):
     return db.query(Meeting).all()
 
-#  GET /meetings/{id}
+# ✅ GET /meetings/{id}
 @router.get("/{meeting_id}", response_model=MeetingResponse)
 def get_meeting(meeting_id: UUID, db: Session = Depends(get_db)):
     meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
@@ -73,7 +74,7 @@ def get_meeting(meeting_id: UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Meeting not found")
     return meeting
 
-#  GET /meetings/{id}/transcript
+# ✅ GET /meetings/{id}/transcript
 @router.get("/{meeting_id}/transcript")
 def get_transcript(meeting_id: UUID, db: Session = Depends(get_db)):
     meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
@@ -81,7 +82,7 @@ def get_transcript(meeting_id: UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Meeting not found")
     return {"id": meeting_id, "transcript": meeting.transcript}
 
-#  GET /meetings/{id}/summary
+# ✅ GET /meetings/{id}/summary
 @router.get("/{meeting_id}/summary")
 def get_summary(meeting_id: UUID, db: Session = Depends(get_db)):
     meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
@@ -93,7 +94,7 @@ def get_summary(meeting_id: UUID, db: Session = Depends(get_db)):
         "keywords": meeting.keywords
     }
 
-#  GET /meetings/{id}/action-items
+# ✅ GET /meetings/{id}/action-items
 @router.get("/{meeting_id}/action-items")
 def get_action_items(meeting_id: UUID, db: Session = Depends(get_db)):
     meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
@@ -102,7 +103,7 @@ def get_action_items(meeting_id: UUID, db: Session = Depends(get_db)):
     action_items = json.loads(meeting.action_items) if meeting.action_items else []
     return {"id": meeting_id, "action_items": action_items}
 
-#  GET /meetings/search?q=keyword
+# ✅ GET /meetings/search?q=keyword
 @router.get("/search/")
 def search_meetings(q: str, db: Session = Depends(get_db)):
     results = db.query(Meeting).filter(
@@ -112,7 +113,64 @@ def search_meetings(q: str, db: Session = Depends(get_db)):
     ).all()
     return results
 
-# DELETE /meetings/{id}
+# ✅ GET /meetings/{id}/export/json
+@router.get("/{meeting_id}/export/json")
+def export_json(meeting_id: UUID, db: Session = Depends(get_db)):
+    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    export_data = {
+        "id": str(meeting.id),
+        "file_path": meeting.file_path,
+        "transcript": meeting.transcript,
+        "summary": meeting.summary,
+        "keywords": meeting.keywords,
+        "action_items": json.loads(meeting.action_items) if meeting.action_items else [],
+        "decisions": meeting.decisions,
+        "status": meeting.status,
+        "created_at": str(meeting.created_at),
+        "updated_at": str(meeting.updated_at)
+    }
+    return JSONResponse(content=export_data)
+
+# ✅ GET /meetings/{id}/export/txt
+@router.get("/{meeting_id}/export/txt")
+def export_txt(meeting_id: UUID, db: Session = Depends(get_db)):
+    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    content = f"""
+MEETING REPORT
+==============
+ID: {meeting.id}
+Date: {meeting.created_at}
+Status: {meeting.status}
+
+TRANSCRIPT
+----------
+{meeting.transcript or 'No transcript available'}
+
+SUMMARY
+-------
+{meeting.summary or 'No summary available'}
+
+KEYWORDS
+--------
+{meeting.keywords or 'No keywords available'}
+
+ACTION ITEMS
+------------
+{meeting.action_items or 'No action items available'}
+
+DECISIONS
+---------
+{meeting.decisions or 'No decisions available'}
+""".strip()
+
+    return PlainTextResponse(content=content)
+
+# ✅ DELETE /meetings/{id}
 @router.delete("/{meeting_id}")
 def delete_meeting(meeting_id: UUID, db: Session = Depends(get_db)):
     meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
