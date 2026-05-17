@@ -1,37 +1,38 @@
-# main.py
 from fastapi import FastAPI
-from app.database import Base, engine, get_db
-from app.models import meeting
-from app.models import user             
+from fastapi.middleware.cors import CORSMiddleware
+from app.database import Base, engine
+from app.models import meeting  # noqa: F401
+from app.models import user     # noqa: F401
 from app.routes import meetings
-from app.routes import auth            
-from sqlalchemy.orm import Session
-from fastapi import Depends
+from app.routes import auth
 
-app = FastAPI()
+app = FastAPI(
+    title="AI Meeting API",
+    description="Upload meeting recordings and get AI-generated transcripts, summaries, action items and decisions.",
+    version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(meetings.router)
-app.include_router(auth.router)         
-# Wrap in try/except so server still starts even if DB is briefly unreachable
+app.include_router(auth.router)
+
 try:
     Base.metadata.create_all(bind=engine)
-    print(" Database tables created successfully")
+    print("Database tables created successfully")
 except Exception as e:
-    print(f"  Could not connect to database on startup: {e}")
+    print(f"Could not connect to database on startup: {e}")
 
 @app.get("/")
 def root():
-    return {"message": "API is running"}
+    return {"status": "ok", "message": "AI Meeting API is running"}
 
 @app.get("/health")
-def health_check(db: Session = Depends(get_db)):
-    try:
-        return {
-            "status": "healthy",
-            "database": "connected"
-        }
-    except Exception as e:
-        return {
-            "status": "unhealthy",
-            "database": "disconnected"
-        }
+def health_check():
+    return {"status": "healthy", "service": "AI Meeting API"}

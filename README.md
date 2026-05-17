@@ -1,31 +1,43 @@
-# 🎙️ AI Meeting API
+# AI Meeting API
 
-An intelligent meeting analysis backend built with **FastAPI**, **Supabase**, **AssemblyAI**, and **Groq LLaMA**. Upload audio/video recordings and get AI-powered transcripts, summaries, keywords, action items, and decisions automatically.
+> Save hours on meeting notes — upload any recording and get AI-generated transcripts, summaries, action items and decisions instantly.
 
----
-
-## 🚀 Live Demo
-
-> API Base URL: `https://your-deployment-url.com`
-> Swagger Docs: `https://your-deployment-url.com/docs`
+![Python](https://img.shields.io/badge/Python-3.11+-blue?style=flat-square&logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.135-green?style=flat-square&logo=fastapi)
+![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
 
 ---
 
-## ✨ Features
+## Why I built this
 
-- 🎤 **Audio/Video Upload** — Upload mp3, mp4, wav, m4a files to Supabase cloud storage
-- 📝 **AI Transcription** — Automatic speech-to-text via AssemblyAI
-- 🤖 **AI Summary** — Intelligent meeting summaries via Groq LLaMA 3
-- 🔑 **Keyword Extraction** — Auto-extracted meeting keywords
-- ✅ **Action Items** — Extracted tasks with owner and deadline
-- 🏛️ **Decision Tracking** — Key decisions made during the meeting
-- 🔐 **JWT Authentication** — Secure register/login system
-- 📤 **Export** — Download meeting reports as JSON or TXT
-- 🔍 **Search** — Search meetings by transcript, summary, or keywords
+Manually writing meeting notes and chasing action items wastes 30–60 minutes after every meeting. This API automates the entire process — transcription, summarization, and decision capture — in one upload.
 
 ---
 
-## 🛠️ Tech Stack
+## Live Demo
+
+> **Fill in your URL after deploying to Render:**
+>
+> API Base URL: `https://YOUR_RENDER_URL.onrender.com`
+> Swagger Docs: `https://YOUR_RENDER_URL.onrender.com/docs`
+
+---
+
+## Features
+
+- **Audio/Video Upload** — Upload mp3, mp4, wav, m4a files to Supabase cloud storage
+- **AI Transcription** — Automatic speech-to-text via AssemblyAI
+- **AI Summary** — Intelligent meeting summaries via Groq LLaMA 3
+- **Keyword Extraction** — Auto-extracted meeting keywords
+- **Action Items** — Extracted tasks with owner and deadline
+- **Decision Tracking** — Key decisions made during the meeting
+- **JWT Authentication** — Secure register/login system
+- **Export** — Download meeting reports as JSON or TXT
+- **Search** — Search meetings by transcript, summary, or keywords
+
+---
+
+## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
@@ -36,11 +48,11 @@ An intelligent meeting analysis backend built with **FastAPI**, **Supabase**, **
 | AI Summarization | Groq LLaMA 3.3 70B |
 | Authentication | JWT (python-jose) |
 | Password Hashing | bcrypt (passlib) |
-| Deployment | Render / Railway |
+| Deployment | Render |
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 ai-meeting-api/
@@ -61,19 +73,20 @@ ai-meeting-api/
 │   └── utils/
 │       ├── file_handler.py  # Supabase file upload
 │       └── auth.py          # JWT token utilities
-├── uploads/                 # Local temp storage
-├── .env                     # Environment variables
+├── .env.example             # Environment variable template
 ├── requirements.txt         # Python dependencies
+├── render.yaml              # Render deployment config
+├── Procfile                 # Backup deployment config
 └── README.md
 ```
 
 ---
 
-## ⚙️ Setup & Installation
+## Setup & Installation
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/ai-meeting-api.git
+git clone https://github.com/g-k-s-03/ai-meeting-api.git
 cd ai-meeting-api
 ```
 
@@ -90,21 +103,18 @@ pip install -r requirements.txt
 ```
 
 ### 4. Setup environment variables
-Create a `.env` file in the root directory:
 ```bash
-# Database
-DATABASE_URL=postgresql://postgres:[password]@db.[ref].supabase.co:5432/postgres
+cp .env.example .env
+# Then fill in your real values in .env
+```
 
-# Supabase Storage
-SUPABASE_URL=https://[ref].supabase.co
+```env
+DATABASE_URL=postgresql://postgres:PASSWORD@db.REF.supabase.co:5432/postgres
+SUPABASE_URL=https://REF.supabase.co
 SUPABASE_KEY=your_service_role_key
-
-# AI Services
 ASSEMBLYAI_API_KEY=your_assemblyai_key
 GROQ_API_KEY=your_groq_key
-
-# JWT Auth
-SECRET_KEY=your_secret_key
+SECRET_KEY=your_random_secret_key
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
@@ -121,7 +131,7 @@ http://127.0.0.1:8000/docs
 
 ---
 
-## 📡 API Endpoints
+## API Endpoints
 
 ### Authentication
 | Method | Endpoint | Description |
@@ -151,7 +161,7 @@ http://127.0.0.1:8000/docs
 
 ---
 
-## 🔄 API Workflow
+## API Workflow
 
 ```
 1. Register/Login → get JWT token
@@ -177,7 +187,7 @@ http://127.0.0.1:8000/docs
 
 ---
 
-## 📋 Example Response
+## Example Response
 
 ```json
 {
@@ -202,7 +212,7 @@ http://127.0.0.1:8000/docs
 
 ---
 
-## 🔐 Authentication Example
+## Authentication Example
 
 ### Register
 ```bash
@@ -218,44 +228,33 @@ curl -X POST "http://localhost:8000/auth/login" \
   -d '{"email": "user@example.com", "password": "password123"}'
 ```
 
----
-
-## 📦 Requirements
-
-```
-fastapi
-uvicorn
-sqlalchemy
-psycopg2-binary
-python-dotenv
-supabase
-assemblyai
-groq
-python-jose[cryptography]
-passlib[bcrypt]
-python-multipart
-email-validator
+### Using protected endpoints
+```bash
+curl -X GET "http://localhost:8000/meetings/" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
 
 ---
 
-## 🌐 Deployment
+## Deployment on Render
 
-This API is deployed on **Render**:
-- Auto-deploy from GitHub
-- Environment variables configured in dashboard
-- PostgreSQL via Supabase (external)
+1. Push this repo to GitHub
+2. Go to [render.com](https://render.com) → New → Web Service
+3. Connect your GitHub repo
+4. Render will auto-detect `render.yaml`
+5. Add your environment variables in the Render dashboard
+6. Deploy — health check hits `/health`
 
 ---
 
-## 👨‍💻 Author
+## Author
 
 **Govind** — Backend & AI Developer
-- GitHub: [@yourusername](https://github.com/yourusername)
-- Portfolio: [yourportfolio.com](https://yourportfolio.com)
+- GitHub: [@g-k-s-03](https://github.com/g-k-s-03)
+- Portfolio: [portfolio-github-io-teal-one.vercel.app](https://portfolio-github-io-teal-one.vercel.app)
 
 ---
 
-## 📄 License
+## License
 
-MIT License — feel free to use this project for learning or freelancing portfolio.
+MIT License — feel free to use this project for learning or as a portfolio piece.
