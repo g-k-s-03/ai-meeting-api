@@ -18,8 +18,8 @@ Manually writing meeting notes and chasing action items wastes 30–60 minutes a
 
 > **Fill in your URL after deploying to Render:**
 >
-> API Base URL: `https://YOUR_RENDER_URL.onrender.com`
-> Swagger Docs: `https://YOUR_RENDER_URL.onrender.com/docs`
+>API Base URL: https://ai-meeting-api-1.onrender.com
+Swagger Docs: https://ai-meeting-api-1.onrender.com/docs
 
 ---
 
