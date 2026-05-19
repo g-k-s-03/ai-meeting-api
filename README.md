@@ -52,6 +52,26 @@ Swagger Docs: https://ai-meeting-api-1.onrender.com/docs
 
 ---
 
+## Requirements
+
+```
+fastapi
+uvicorn
+SQLAlchemy
+psycopg2-binary
+python-dotenv
+pydantic
+email-validator
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+assemblyai
+groq
+supabase
+```
+
+---
+
 ## Project Structure
 
 ```
