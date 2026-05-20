@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Backgro
 from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy.orm import Session
 from uuid import UUID
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from app.models.meeting import Meeting
 from app.schemas.meeting import MeetingResponse
 from app.utils.file_handler import upload_file_to_supabase
@@ -18,15 +18,18 @@ router = APIRouter(
     tags=["Meetings"]
 )
 
-def process_meeting_background(meeting_id: UUID, file_url: str, db: Session):
-    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+def process_meeting_background(meeting_id: UUID, file_url: str):
+    # Opens its own session — the request session is already closed by this point
+    db = SessionLocal()
+    meeting = None
     try:
-        print(f"🔄 Starting processing for meeting {meeting_id}")
+        meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+        if not meeting:
+            print(f"Meeting {meeting_id} not found in background task")
+            return
         meeting.status = "processing"
         db.commit()
-        print(f"🔄 Sending to AssemblyAI: {file_url}")
         result = process_meeting(file_url)
-        print(f"✅ AI processing completed!")
         meeting.transcript = result["transcript"]
         meeting.summary = result["summary"]
         meeting.keywords = result["keywords"]
@@ -34,11 +37,14 @@ def process_meeting_background(meeting_id: UUID, file_url: str, db: Session):
         meeting.decisions = result["decisions"]
         meeting.status = "completed"
         db.commit()
-        print(f"✅ Meeting {meeting_id} completed successfully!")
+        print(f"Meeting {meeting_id} completed successfully")
     except Exception as e:
-        meeting.status = "failed"
-        db.commit()
-        print(f"❌ Processing failed: {str(e)}")
+        print(f"Processing failed for {meeting_id}: {str(e)}")
+        if meeting:
+            meeting.status = "failed"
+            db.commit()
+    finally:
+        db.close()
 
 # ✅ POST /meetings/upload 🔒
 @router.post("/upload", response_model=MeetingResponse)
@@ -53,7 +59,7 @@ async def upload_meeting(
     db.add(new_meeting)
     db.commit()
     db.refresh(new_meeting)
-    background_tasks.add_task(process_meeting_background, new_meeting.id, file_url, db)
+    background_tasks.add_task(process_meeting_background, new_meeting.id, file_url)
     return new_meeting
 
 # ✅ GET /meetings 🔒

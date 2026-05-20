@@ -12,9 +12,7 @@ groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 def transcribe_audio(file_url: str) -> str:
     try:
-        config = aai.TranscriptionConfig(
-            speech_models=[aai.SpeechModel.universal]
-        )
+        config = aai.TranscriptionConfig(speech_model=aai.SpeechModel.best)
         transcriber = aai.Transcriber(config=config)
         transcript = transcriber.transcribe(file_url)
         if transcript.status == aai.TranscriptStatus.error:
