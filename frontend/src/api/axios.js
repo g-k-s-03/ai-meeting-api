@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: 'https://ai-meeting-api-1.onrender.com',
+  baseURL: 'https://ai-meeting-api-s0vw.onrender.com',
 })
 
 api.interceptors.request.use(config => {
