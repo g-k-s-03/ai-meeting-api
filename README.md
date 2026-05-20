@@ -277,4 +277,4 @@ curl -X GET "http://localhost:8000/meetings/" \
 
 ## License
 
-MIT License — feel free to use this project for learning or as a portfolio piece.
+MIT License — feel free to use this project for learning or as a portfolio piece. anyone can use
