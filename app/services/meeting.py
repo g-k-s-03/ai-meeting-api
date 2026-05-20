@@ -22,7 +22,7 @@ def transcribe_audio(file_url: str) -> str:
     try:
         print(f"[transcribe] Starting transcription for: {file_url}")
         print(f"[transcribe] AssemblyAI API key set: {bool(ASSEMBLYAI_API_KEY)}")
-        config = aai.TranscriptionConfig(speech_model=aai.SpeechModel.best)
+        config = aai.TranscriptionConfig(speech_models=aai.SpeechModel.best)
         transcriber = aai.Transcriber(config=config)
         transcript = transcriber.transcribe(file_url)
         print(f"[transcribe] Status: {transcript.status}")
